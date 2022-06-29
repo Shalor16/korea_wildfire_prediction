@@ -1,2 +1,1 @@
-# korea_wildfire_prediction
-predict wildfire possibility in Korea
+# 한국 산불 발생 예측 프로젝트
