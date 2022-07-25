@@ -1,201 +1,245 @@
 import pandas as pd
 import json
 import plotly.graph_objects as go
-from dash import Dash, dcc, html, Input, Output
+from dash import Dash, dcc, html, Input, Output, dash_table
 import plotly.express as px
-import plotly.express as px
+import dash_bootstrap_components as dbc
+import math
+
 
 state_geo1 = json.load(open('map (7).zip.geojson', encoding='utf-8'))
 df = pd.read_csv('one_day.csv', encoding='utf-8')
+df_p = pd.read_csv('one_day_predicted.csv', encoding='utf-8')
 df['sigun_code'] = df['sigun_code'].astype(str)
 
-# for idx, sigun_dict in enumerate(state_geo1['features']):
-#     sigun_id = df.loc[(df.지점명 == sigun_dict['properties']['SIG_KOR_NM'][:2]), '지점명'].iloc[0]
-    
-suburbs = df['sigun_nm'].str.title().tolist()
-color_deep = [[0.0, 'rgb(253, 253, 204)'],
-              [0.1, 'rgb(201, 235, 177)'],
-              [0.2, 'rgb(145, 216, 163)'],
-              [0.3, 'rgb(102, 194, 163)'],
-              [0.4, 'rgb(81, 168, 162)'],
-              [0.5, 'rgb(72, 141, 157)'],
-              [0.6, 'rgb(64, 117, 152)'],
-              [0.7, 'rgb(61, 90, 146)'],
-              [0.8, 'rgb(65, 64, 123)'],
-              [0.9, 'rgb(55, 44, 80)'],
-              [1.0, 'rgb(39, 26, 44)']]
+latitude = 35.565
+longitude = 127.986
 
-# trace1 = []
-# trace1.append(go.Choroplethmapbox(
+token = open(".mapbox_token").read()
+
+
+
+suburbs = df['stnNm'].str.title().tolist()
+suburbs_p = df_p['지점명'].str.title().tolist()
+
+# trace_left = []
+# trace_left.append(go.Choroplethmapbox(
 #     geojson=state_geo1,
 #     locations = df['sigun_code'].tolist(),
-#     z=df['소멸위험지수'].tolist(),
-#     text = suburbs,
-#     featureidkey = "properties.merged",
-#     colorscale=color_deep,
-#     colorbar=dict(thickness=20, ticklen=3),
-#     zmin=0,
-#     zmax=df['소멸위험지수'].max() + 0.5,
+#     z=df['ta'].tolist(),
+#     text=suburbs,
+#     featureidkey='properties.merged',
+#     zmin = min(df['ta'].tolist())-0.5,
+#     zmax = max(df['ta'].tolist())+0.5,
+#     visible=True,
+#     subplot='mapbox',
+#     colorbar=dict(x=0.7),
+#     colorscale='Blackbody',
     
-#     visible=False,
-#     subplot='mapbox1',
 #     hovertemplate="<b>%{text}</b><br><br>" +
 #                     "value: %{z}<br>" +
 #                     "<extra></extra>"
     
 # ))
-# trace1[0]['visible'] = True
 
-latitude = 35.565
-longitude = 127.986
+# trace_right = []
+# trace_right.append(go.Bar(
+#     x=df.sort_values(['ta'],ascending=False).head(10)['ta'],
+#     y=df.sort_values(['ta'],ascending=False).head(10)['stnNm'].str.title().tolist(),
+#     xaxis = 'x2',
+#     yaxis = 'y2',
+#     marker = dict(
+#         color='blue',
+        
+#     ),
+#     visible=True,
+#     orientation='h',
+# ))
 
-# layout = go.Layout(
-#     title={'text': 'Number of people in Korea / Local extinction in 2018',
-#            'font': {'size': 28,
-#                     'family': 'Arial'}},
-#     autosize=True,
+layout = go.Layout(
+    autosize=True,
+    mapbox=dict(
+        domain={'x':[0,0.7], 'y':[0,1]},
+        center=dict(lat=latitude, lon=longitude),
+        style="open-street-map",
+        zoom=5
+    ),
+    xaxis2={
+        'domain':[0.77,1],
+        'side':'right',
+        'anchor':'x2',
+    },
+    yaxis2={
+        'domain':[0,1],
+        'anchor':'y2',
+        'autorange':'reversed',
+    },
+    margin=dict(l=80,r=20,t=70,b=70),
+    
+)
+# fig = go.Figure(data=trace_left+trace_right, layout=layout)
 
-#     mapbox1=dict(
-#         domain={'x': [0.3, 1], 'y': [0, 1]},
-#         center=dict(lat=latitude, lon=longitude),
-#         style="open-street-map",
-#         #accesstoken = mapbox_accesstoken,
-#         zoom=5),
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+#,dbc.themes.BOOTSTRAP
 
-#     xaxis2={
-#         'zeroline': False,
-#         "showline": False,
-#         "showticklabels": True,
-#         'showgrid': True,
-#         'domain': [0, 0.25],
-#         'side': 'left',
-#         'anchor': 'x2',
-#     },
-#     yaxis2={
-#         'domain': [0.4, 0.9],
-#         'anchor': 'y2',
-#         'autorange': 'reversed',
-#     },
-#     margin=dict(l=100, r=20, t=70, b=70),
-#     paper_bgcolor='rgb(204, 204, 204)',
-#     plot_bgcolor='rgb(204, 204, 204)',
-# )
-#token = open(".mapbox_token").read()
-token = open(".mapbox_token").read()
-
-app = Dash(__name__)
-
-
-
-
+app =Dash(__name__, external_stylesheets=external_stylesheets)
+server = app.server
 
 app.layout = html.Div([
-    html.H4('Interactive dashboard for wildfire prediction and weather info'),
+    html.H1('Interactive dashboard for wildfire prediction and weather info'),
     dcc.Dropdown(['WEATHER','WILDFIRE'], 'WEATHER', id = 'map-dropdown',style={"width": 200}),
     dcc.Graph(id="graph"),
+    dcc.Interval(
+        id = 'interval-component',
+        interval=1*10000,
+        n_intervals=0
+    ),
+    html.Div([
+        html.Div([
+        html.H6('산불 통계 확인',style=dict(textAlign='center')),
+        html.Button(html.A('바로가기',href='https://public.tableau.com/shared/NYJRQC2W2?:display_count=n&:origin=viz_share_link', title='link'),style={'marginBottom':50, 'align':'center'}),
+        html.Div(id='container')
+        ], style=dict(textAlign='center')),
+        html.Div([
+            dash_table.DataTable(
+                
+                data = df_p.to_dict('records'),
+                columns=[
+                    {'name' : i, 'id' : i, 'deletable': False, "selectable":False} for i in df_p.columns
+                ],
+                editable=False,
+                filter_action="native",
+                sort_action="native",
+                sort_mode="multi",
+                row_selectable="multi",
+                row_deletable=False,
+                selected_rows=[],
+                page_action="native",
+                page_current=0,
+                page_size=6,
+
+                style_cell_conditional=[
+                    {
+                        'if': {'column_id': c},
+                        'textAlign': 'left'
+                    } for c in ['Date', 'Region']
+                ],
+                style_data_conditional=[
+                    {
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': 'rgb(248, 248, 248)'
+                    }
+                ],
+                style_header={
+                    'backgroundColor': 'rgb(230, 230, 230)',
+                    'fontWeight': 'bold'
+                },
+                
+            )
+        
+        ])
+    ], className='row')
+
 ])
-
-
 
 @app.callback(
     Output('graph', 'figure'),
-    Input('map-dropdown','value')
+    Input('map-dropdown','value'),
+    Input('interval-component','n_intervals')
 )
-def display_choropleth(map_kind):
-    fig = px.choropleth_mapbox(
-        df, geojson=state_geo1, color='ta',
-        hover_name=df['stnNm'],hover_data=['tm','ta'],
-        locations="sigun_code", featureidkey="properties.merged",
-        center={"lat": latitude, "lon": longitude}, zoom=6,
-        range_color=[min(df['ta'].tolist())-0.5, max(df['ta'].tolist())+0.5])
-    fig.update_layout(
-        margin={"r":0,"t":60,"l":0,"b":0},
-        mapbox_accesstoken=token
-    )
+def display_choropleth(map_kind, interval):
+    if map_kind=='WEATHER':
+        trace_left = []
+        trace_left.append(go.Choroplethmapbox(
+            geojson=state_geo1,
+            locations = df['sigun_code'].tolist(),
+            z=df['ta'].tolist(),
+            text=suburbs,
+            featureidkey='properties.merged',
+            zmin = min(df['ta'].tolist())-0.5,
+            zmax = max(df['ta'].tolist())+0.5,
+            visible=True,
+            subplot='mapbox',
+            colorbar=dict(x=0.7),
+            colorscale='Blues',
+            
+            hovertemplate="<b>%{text}</b><br><br>" +
+                            "value: %{z}<br>" +
+                            "<extra></extra>"
+            
+        ))
+
+        trace_right = []
+        trace_right.append(go.Bar(
+            x=df.sort_values(['ta'],ascending=False).head(10)['ta'],
+            y=df.sort_values(['ta'],ascending=False).head(10)['stnNm'].str.title().tolist(),
+            xaxis = 'x2',
+            yaxis = 'y2',
+            marker = dict(
+                color='blue',
+                
+            ),
+            visible=True,
+            orientation='h',
+        ))
+    else:
+        trace_left = []
+        trace_left.append(go.Choroplethmapbox(
+            geojson=state_geo1,
+            locations = df_p['sigun_code'].tolist(),
+            z=df_p['proba'].map(lambda x:x*100).tolist(),
+            text=suburbs_p,
+            featureidkey='properties.merged',
+            zmin = min(df_p['proba'].map(lambda x:x*100).tolist())-0.5,
+            zmax = max(df_p['proba'].map(lambda x:x*100).tolist())+0.5,
+            visible=True,
+            subplot='mapbox',
+            colorbar=dict(x=0.7),
+            colorscale='Blues',
+            
+            hovertemplate="<b>%{text}</b><br><br>" +
+                            "value: %{z}<br>" +
+                            "<extra></extra>"
+            
+        ))
+
+        trace_right = []
+        trace_right.append(go.Bar(
+            x=df_p.sort_values(['proba'],ascending=False).head(10)['proba'],
+            y=df_p.sort_values(['proba'],ascending=False).head(10)['지점명'].str.title().tolist(),
+            xaxis = 'x2',
+            yaxis = 'y2',
+            marker = dict(
+                color='blue',
+                
+            ),
+            visible=True,
+            orientation='h',
+        ))
+    fig = go.Figure(data=trace_left+trace_right, layout=layout)
     return fig
-# @app.callback(
-#     Output("graph", "figure"), 
-#     Input("candidate", "value"))
-# def display_choropleth(candidate):
-#     #df = px.data.election() # replace with your own data source
-#     #geojson = px.data.election_geojson()
+
+@app.callback(
+    Output('container', 'children'),
+    Input('interval-component','n_intervals')
+)
+def display_proba(mapkind):
+    locations = df_p['지점명'].tolist()[:10]
+    probas = df_p['proba'].map(lambda x:x*100).tolist()[:10]
+    merged = list(zip(df_p['지점명'].tolist(),df_p['proba'].map(lambda x:x*100).tolist()))
     
-#     fig = px.choropleth_mapbox(
-#         df, geojson=state_geo1, color='ws',
-#         locations="sigun_code", featureidkey="properties.merged",
-#         center={"lat": latitude, "lon": longitude}, zoom=6,
-#         range_color=[0, max(df['ws'].tolist())+0.5])
-#     fig.update_layout(
-#         margin={"r":0,"t":0,"l":0,"b":0},
-#         mapbox_accesstoken=token
-#         )
-
-#     return fig
-
-
-
-# fig = px.choropleth_mapbox(df, geojson=state_geo1, locations='sigun_code', color='소멸위험지수',
-#                            color_continuous_scale="Viridis",
-#                            range_color=[0, 3],
-#                            featureidkey='properties.merged',
-#                            mapbox_style="carto-positron",
-#                            zoom=3, center = {"lat": latitude, "lon": longitude},
-#                            opacity=0.5,
-#                            labels={'소멸위험지수':'unemployment rate'}
-#                           )
-# fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0},
-#                   mapbox_accesstoken=token)
-# #fig = go.Figure(data=trace1, layout=layout)
-
-# external_stylesheets= ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-# app = dash.Dash(__name__, external_stylesheets = external_stylesheets)
-# server = app.server
-
-# app.layout = html.Div([
-#     html.Div(children=[
-#         dcc.Graph(
-#             id='example-graph-1',
-#             figure=fig
-#         )
-#     ])
-# ])
-
-# import dash
-# import dash_core_components as dcc
-# import dash_html_components as html
-# from dash.dependencies import Input, Output
-# import plotly.graph_objects as go
-
-# app = dash.Dash(__name__)
-
-
-# app.layout = html.Div([
-#     html.H4('Interactive color selection with simple Dash example'),
-#     html.P("Select color:"),
-#     dcc.Dropdown(
+    return html.Div([
+        html.H6('산불 발생 위험 지역 상위 10 지역'),
+        html.Div([
+            html.Tr([html.Th(i) for i in df_p.sort_values(['proba'],ascending=False).head(10)['지점명'].str.title().tolist()]),
+            html.Tr([html.Td(str(round(k*100))+'%') for k in df_p.sort_values(['proba'],ascending=False).head(10)['proba'].tolist()])
+        ],style=dict(display='inline-block'))
         
-#         options=[
-#             {'label': "Gold" , "value":"Gold"},
-#             {'label': "MediumTurquoise", "value" : "MediumTurquoise"},
-#             {'label': "LightGreen", "value" : "LightGreen"}
-#             ],
-#         value='Gold',
-#         clearable=False,
-#         id="dropdown",
-        
-#     ),
-#     dcc.Graph(id="graph"),
-# ])
+    ],style=dict(textAlign='center'))
 
 
-# @app.callback(
-#     Output("graph", "figure"), 
-#     Input("dropdown", "value"))
-# def display_color(color):
-#     fig = go.Figure(
-#         data=go.Bar(y=[2, 3, 1], # replace with your own data source
-#                     marker_color=color))
-#     return fig
+
+
 
 
 app.run_server(debug=True)
