@@ -56,3 +56,9 @@ $RECYCLE.BIN/
 
 # csv files
 *.csv
+
+#Heroku
+venv*
+.pyc
+.DS_Store
+.env

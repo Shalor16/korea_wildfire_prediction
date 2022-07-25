@@ -91,7 +91,7 @@ app = Dash(__name__)
 
 app.layout = html.Div([
     html.H4('Interactive dashboard for wildfire prediction and weather info'),
-    dcc.Dropdown(['WEATHER','WILDFIRE'], 'WEATHER', id = 'map-dropdown'),
+    dcc.Dropdown(['WEATHER','WILDFIRE'], 'WEATHER', id = 'map-dropdown',style={"width": 200}),
     dcc.Graph(id="graph"),
 ])
 
@@ -103,12 +103,13 @@ app.layout = html.Div([
 )
 def display_choropleth(map_kind):
     fig = px.choropleth_mapbox(
-        df, geojson=state_geo1, color='ws',
+        df, geojson=state_geo1, color='ta',
+        hover_name=df['stnNm'],hover_data=['tm','ta'],
         locations="sigun_code", featureidkey="properties.merged",
         center={"lat": latitude, "lon": longitude}, zoom=6,
-        range_color=[0, max(df['ws'].tolist())+0.5])
+        range_color=[min(df['ta'].tolist())-0.5, max(df['ta'].tolist())+0.5])
     fig.update_layout(
-        margin={"r":0,"t":0,"l":0,"b":0},
+        margin={"r":0,"t":60,"l":0,"b":0},
         mapbox_accesstoken=token
     )
     return fig
